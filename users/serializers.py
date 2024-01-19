@@ -11,6 +11,7 @@ from django.contrib.auth import authenticate
 
 
 class SingUpSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.ImageField(required=False)
     class Meta:
         model = User
         fields = ['id', 'name', 'username', 'email', 'password', 'email_verified', 'profile_picture', 'subscription_plan']
@@ -64,6 +65,7 @@ class SingUpSerializer(serializers.ModelSerializer):
     
     
 class UserSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.ImageField(required=False)
     class Meta:
         model = User
-        fields = ('username','name' ,'email') 
+        fields = ('username','name' ,'email','profile_picture', 'subscription_plan') 

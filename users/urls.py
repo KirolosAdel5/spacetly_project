@@ -15,11 +15,13 @@ urlpatterns = [
     
     path('userinfo/', current_user,name='user_info'), 
     path('userinfo/update/', update_user,name='update_user'), 
+    
     path('forgot_password/', forgot_password,name='forgot_password'), 
     path('reset_password/<str:token>',reset_password,name='reset_password'), 
     
-    path('logout/', APILogoutView.as_view(), name='logout_token'),
+    path('user/logout/', APILogoutView.as_view(), name='logout_token'),
 
+    path('set-user-permissions/<str:username>/', set_user_permissions, name='set_user_permissions'),
 
 
 ]

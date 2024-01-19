@@ -17,7 +17,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate, login as django_login
 from django.contrib.auth import logout
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes,parser_classes
 from django.contrib.auth.hashers import make_password
 from django.shortcuts import get_object_or_404, render
 from django.utils.crypto import get_random_string
@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from .permissions import IsAdminOrPostOnly 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 User = get_user_model()
@@ -33,6 +34,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = SingUpSerializer
     permission_classes = [IsAdminOrPostOnly]
+    lookup_field = 'username'
 
 
     def create(self, request):
@@ -144,19 +146,23 @@ def current_user(request):
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def update_user(request):
     user = request.user
     data = request.data
 
-    user.name = data['name']
-    user.username = data['username']
-    user.email = data['email']
+    user.name = data.get('name', user.name)
+    user.username = data.get('username', user.username)
 
-    if data['password'] != "":
-        user.password =  make_password(data['password'])
+    if 'password' in data and data['password'] != "":
+        user.password = make_password(data['password'])
+
+    # Check if 'profile_picture' is present in the request data
+    if 'profile_picture' in request.data:
+        user.profile_picture = request.data['profile_picture']
 
     user.save()
-    serializer = UserSerializer(user,many=False)
+    serializer = UserSerializer(user, many=False)
     return Response(serializer.data)
 
 def get_current_host(request):
@@ -242,3 +248,32 @@ class APILogoutView(APIView):
         token.blacklist()
         logout(request)
         return Response({"status": "OK, goodbye"})
+    
+    
+            
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_user_permissions(request, username):
+    # Check if the requesting user is a superuser or staff
+    if not (request.user.is_superuser or request.user.is_staff):
+        return Response({"error": "You do not have permission to perform this action"}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data
+    is_staff = data.get('is_staff', False)
+    is_superuser = data.get('is_superuser', False)
+
+    # Only superusers can set superuser flag
+    if request.user.is_superuser:
+        user.is_superuser = is_superuser
+
+    # Both superusers and staff can set staff flag
+    user.is_staff = is_staff
+
+    user.save()
+
+    return Response({"message": "User permissions updated successfully"}, status=status.HTTP_200_OK)
