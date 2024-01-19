@@ -93,7 +93,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def send_reset_otp(self, request):
         email = request.data.get('email', '')
-
+        print(email)
         try:
             user = User.objects.get(email=email)
 
