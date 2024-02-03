@@ -11,6 +11,10 @@ urlpatterns = [
     path('user/confirm-email/', UserViewSet.as_view({'post': 'confirm_email'}), name='confirm-email'),
     path('user/resend-otp/', UserViewSet.as_view({'post': 'send_reset_otp'}), name='send-reset-otp'),
     path('user/login/', CustomTokenObtainPairView.as_view(), name='user-login'),
+    
+    path("google-login/", GoogleLoginRedirectView.as_view(), name="google_login_redirect"),
+    path("google-callback/", GoogleLoginCallbackView.as_view(), name="google_login_callback"),
+
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     path('userinfo/', current_user,name='user_info'), 

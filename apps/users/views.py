@@ -19,14 +19,24 @@ from django.contrib.auth import authenticate, login as django_login
 from django.contrib.auth import logout
 from rest_framework.decorators import api_view, permission_classes,parser_classes
 from django.contrib.auth.hashers import make_password
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render,HttpResponse
+from django.views.generic import View
+
 from django.utils.crypto import get_random_string
 from datetime import datetime, timedelta
 from .permissions import IsAdminOrPostOnly 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.shortcuts import redirect
+from social_django.utils import load_strategy
 
+from .services import GoogleRawLoginFlowService
+
+import json
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 
 User = get_user_model()
 
@@ -34,7 +44,6 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = SingUpSerializer
     permission_classes = [IsAdminOrPostOnly]
-    lookup_field = 'username'
 
 
     def create(self, request):
@@ -234,6 +243,82 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         else:
             return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
+
+class PublicApi(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+    
+class GoogleLoginRedirectView(PublicApi):
+    def get(self, request, *args, **kwargs):
+        google_login_flow = GoogleRawLoginFlowService()
+
+        authorization_url, state = google_login_flow.get_authorization_url()
+
+        request.session["google_oauth2_state"] = state
+
+        return redirect(authorization_url)
+
+    
+
+class GoogleLoginCallbackView(PublicApi):
+        
+    def get(self, request, *args, **kwargs):
+        service = GoogleRawLoginFlowService()
+        code = request.GET.get("code")
+        state = request.GET.get("state")
+        session_state = request.session.get("google_oauth2_state")
+        
+        if code is None or state is None:
+            return Response(
+                {"error": "Code and state are required."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # if state != session_state:
+        #     return Response(
+        #         {"error": "Invalid state parameter."},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+            
+        
+        redirect_uri = settings.GOOGLE_OAUTH2_REDIRECT_URI
+        credentials = service.get_access_token(code, redirect_uri)
+        
+        if "access_token" not in credentials:
+            return Response(
+                {"error": "Access token not found in response."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        access_token = credentials["access_token"]
+        user_info = service.get_user_info(access_token)
+
+        email = user_info.get("email")
+        if not email:
+            return Response(
+                {"error": "Email not found in user info."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        users_with_email = User.objects.filter(email=email)
+        if not users_with_email.exists():
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user = users_with_email.first()
+        access_token, refresh_token = service.get_access_and_refresh_tokens(user)
+        response_data = {
+            "google_token": str(access_token),
+            "access_token": str(access_token),
+            "refresh_token": str(refresh_token),
+        }
+        
+        user.last_login = datetime.now()
+        user.save()
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+    
 class APILogoutView(APIView):
     permission_classes = (IsAuthenticated,)
 
