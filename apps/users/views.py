@@ -256,7 +256,7 @@ class GoogleLoginRedirectView(PublicApi):
 
         request.session["google_oauth2_state"] = state
 
-        return redirect(authorization_url)
+        return Response({"authorization_url": authorization_url})
 
     
 

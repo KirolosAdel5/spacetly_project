@@ -11,8 +11,21 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import environ
+from django.core.management.utils import get_random_secret_key
+
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+
+
+env = environ.Env(
+    DEBUG=(int, 0)
+)
+# reading .env file
+environ.Env.read_env('.env')
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +35,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-1!y6l#i4ufgwuzb_6%0i#1t079vqhn3frq2)7(6i&@su0ijora'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG') == 'on'
 
-ALLOWED_HOSTS = []
+
+BASE_BACKEND_URL  = os.getenv('DJANGO_BASE_BACKEND_URL')
+BASE_FRONTEND_URL = os.getenv('DJANGO_BASE_FRONTEND_URL')
+GOOGLE_OAUTH2_REDIRECT_URI =  f'{BASE_BACKEND_URL}/api/google-callback/'
+
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
 
 
 # Application definition
@@ -51,15 +69,20 @@ THIRD_PARTY_APPS =[
     'dj_rest_auth',
     'dj_rest_auth.registration',
     'social_django',
+    'corsheaders',
+
  ]
 
 LOCAL_APPS =[
     'apps.users',
+    'apps.spacetly_chatbot',
+
  ]
 
 INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -184,31 +207,23 @@ SIMPLE_JWT = {
 
 
 AUTHENTICATION_BACKENDS = [
-    # ...
     'allauth.account.auth_backends.AuthenticationBackend',
     'social_core.backends.google.GoogleOAuth2',
     'django.contrib.auth.backends.ModelBackend',
-
-    # ...
 ]
 
 SITE_ID = 1  # This is required for Django Allauth, adjust if needed
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
-EMAIL_HOST_USER = 'kerooadel5@gmail.com'
-EMAIL_HOST_PASSWORD = 'axvzoimqktbghrgw'
-DEFAULT_FROM_EMAIL = 'kerooadel5@gmail.com'
+EMAIL_HOST = os.getenv('EMAIL_HOST')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS') == '1'
+EMAIL_USE_SSL =  os.getenv('EMAIL_USE_SSL') == '1'
+EMAIL_HOST_USER =  os.getenv('EMAIL')
+EMAIL_HOST_PASSWORD =    os.getenv('PASSWORD')
+DEFAULT_FROM_EMAIL =  EMAIL_HOST_USER
 
-
-GOOGLE_OAUTH2_CLIENT_ID='281947394980-barb9193jf1a89a3vbrva79vcr2vnii7.apps.googleusercontent.com'
-GOOGLE_OAUTH2_CLIENT_SECRET ='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'
-GOOGLE_OAUTH2_REDIRECT_URI = 'http://localhost:8000/api/google-callback/'
+GOOGLE_OAUTH2_CLIENT_ID = os.getenv('DJANGO_GOOGLE_OAUTH2_CLIENT_ID')
+GOOGLE_OAUTH2_CLIENT_SECRET  = os.getenv('DJANGO_GOOGLE_OAUTH2_CLIENT_SECRET')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = ['email', 'profile']
-
-
-BASE_BACKEND_URL = 'http://localhost:8000' 

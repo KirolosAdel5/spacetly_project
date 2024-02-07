@@ -2,7 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
 from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
-
+#app name 
+app_name = 'spacetly_users'
 router = DefaultRouter()
 router.register(r'users', UserViewSet,basename='users')
 
