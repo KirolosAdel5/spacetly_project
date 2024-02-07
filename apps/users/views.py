@@ -228,21 +228,24 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         password = request.data.get('password')
-        user = User.objects.get(email=email)
 
-        if user is not None:
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            user = None
+
+        if user is not None and user.check_password(password):
             refresh = RefreshToken.for_user(user)
             data = {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }
 
-            django_login(request, user)
+            django_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
             return Response({'user': UserSerializer(user).data, 'tokens': data}, status=status.HTTP_200_OK)
         else:
             return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
 
 class PublicApi(APIView):
     authentication_classes = ()
