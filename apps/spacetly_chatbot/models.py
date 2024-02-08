@@ -56,19 +56,9 @@ class Message(models.Model):
     is_from_user = models.BooleanField(default=True)
     in_reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='replies')
 
+  
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
         return f"Message {self.id} - {self.conversation}"
-    
-    def save(self, *args, **kwargs):
-        if self.is_from_user:
-            # Check if the user has a plan
-            if self.conversation.user.plan:
-                max_attachments_allowed = self.conversation.user.plan.max_attachments
-                # Count existing attachments in the message
-                attachment_count = sum(1 for field in [self.image, self.file, self.url] if field)
-                if attachment_count > max_attachments_allowed:
-                    raise ValueError(f"This plan allows a maximum of {max_attachments_allowed} attachments per message.")
-        super().save(*args, **kwargs)

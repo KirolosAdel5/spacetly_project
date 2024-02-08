@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 # from .tasks import send_gpt_request, generate_title_request
+from .tasks import chat_logic
 
 User = get_user_model()
 
@@ -135,51 +136,45 @@ class MessageCreate(generics.CreateAPIView):
             else:
                 message_list.append({"role": "assistant", "content": msg.content})
 
-        name_space = User.objects.get(id=self.request.user.id).username
+        # Call the chat logic function to get a response
+        response = chat_logic(message_list,conversation.ai_model)
 
-        from site_settings.models import SiteSetting
-        # Get system prompt from site settings
-        try:
-            system_prompt_obj = SiteSetting.objects.first()
-            system_prompt = system_prompt_obj.prompt
-        except Exception as e:
-            print(str(e))
-            system_prompt = "You are sonic you can do anything you want."
-
-        # Call the Celery task to get a response from GPT-3
-        task = send_gpt_request.apply_async(args=(message_list, name_space, system_prompt))
-        print(message_list)
-        response = task.get()
-        return [response, conversation.id, messages[0].id]
+        return response, conversation.id, messages[0].id
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        response_list = self.perform_create(serializer)
-        assistant_response = response_list[0]
-        conversation_id = response_list[1]
-        last_user_message_id = response_list[2]
+        response, conversation_id, last_user_message_id = self.perform_create(serializer)
 
         try:
-            # Store GPT response as a message
+            # Store chat response as a message
             message = Message(
                 conversation_id=conversation_id,
-                content=assistant_response,
+                content=response,
                 is_from_user=False,
                 in_reply_to_id=last_user_message_id
             )
             message.save()
 
-        except ObjectDoesNotExist:
-            error = f"Conversation with id {conversation_id} does not exist"
-            Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            error_mgs = str(e)
-            error = f"Failed to save GPT-3 response as a message: {error_mgs}"
-            Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                {
+                    "response": response,
+                    "conversation_id": conversation_id,
+                    "message_id": message.id
+                },
+                status=status.HTTP_201_CREATED,
+                headers=headers
+            )
 
-        headers = self.get_success_headers(serializer.data)
-        return Response({"response": assistant_response}, status=status.HTTP_200_OK, headers=headers)
+        except ObjectDoesNotExist as e:
+            error = f"Conversation with id {conversation_id} does not exist"
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            error_msg = str(e)
+            error = f"Failed to save chat response as a message: {error_msg}"
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConversationRetrieveUpdateView(generics.RetrieveUpdateAPIView):

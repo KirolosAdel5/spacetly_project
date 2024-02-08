@@ -12,7 +12,6 @@ urlpatterns = [
     path('conversations/<int:pk>/favourite/', views.ConversationFavourite.as_view(), name='conversation-favourite'),
     # Archive a conversation
     path('conversations/<int:pk>/archive/', views.ConversationArchive.as_view(), name='conversation-archive'),
-
     # Delete a conversation
     path('conversations/<int:pk>/delete/', views.ConversationDelete.as_view(), name='conversation-delete'),
 

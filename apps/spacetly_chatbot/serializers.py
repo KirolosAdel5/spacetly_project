@@ -23,7 +23,7 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'title', 'favourite', 'archive', 'created_at', 'messages']
+        fields = ['id', 'title', 'ai_model','favourite', 'archive', 'created_at', 'messages']
 
     def get_created_at(self, obj):
         return time_since(obj.created_at)
