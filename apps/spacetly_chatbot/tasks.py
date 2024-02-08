@@ -1,59 +1,25 @@
 from langchain.prompts import PromptTemplate
 from langchain.chains import ConversationChain
-from langchain.llms import GooglePalm
-from langchain.chat_models import ChatGooglePalm
+from langchain_google_genai import GoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.chat_models import ChatOpenAI
-from django.conf import settings
+
+from dotenv import load_dotenv, find_dotenv
 import os
+from django.conf import settings
+
 
 google_api_key = settings.GOOGLE_API_KEY
 openai_api_key = settings.OPENAI_API_KEY
 
-def call_palm(google_api_key:str, temperature=0.5, max_tokens=8000, top_p=0.95, top_k=40, n_batch=9, repeat_penalty=1.1, n_ctx=8000):
-    
-    '''
-    desc:
-    
-        call_palm() is a fuction can be used to instantiate a Google Palm model. 
-        this model can be used to generate text, translate languages, write different kinds of creative content, and answer your questions in an informative way.
-    '''
-    
-    '''
-    Params and args:
-    
-        google_api_key (str): Required Parameter -> The Google API key for the Palm model.
-        temperature (float): Optional Parameter -> The temperature parameter controls the randomness of the generated text. A higher temperature will result in more creative and varied text, but it may also be less accurate.
-        max_output_tokens (int): Optional Parameter -> The maximum number of tokens to generate.
-        top_p (float): Optional Parameter -> The top_p parameter controls the diversity of the generated text. A higher top_p will result in more diverse text, but it may also be less coherent.
-        top_k (int): Optional Parameter -> The top_k parameter controls the number of tokens to consider when generating text. A higher top_k will result in more accurate text, but it may also be less creative.
-        n_batch (int): Optional Parameter -> The n_batch parameter controls the number of batches to use when generating text. A higher n_batch will result in faster generation, but it may also be less accurate.
-        repeat_penalty (float): Optional Parameter -> The repeat_penalty parameter controls the penalty for repeating tokens. A higher repeat_penalty will result in more diverse text, but it may also be less fluent.
-        n_ctx (int): Optional Parameter -> The n_ctx parameter controls the context length used to generate text. A higher n_ctx will result in more coherent text, but it may also be slower to generate.
-    '''
-    
-    '''
-    return:
-    
-         This function returns Google Palm as language model object. 
-         This object can be used to generate text, translate languages, write different kinds of creative content, and answer your questions in an informative way.
-    '''
-        
-    google_palm_model = ChatGooglePalm(
-        
-         google_api_key=google_api_key,
-         temperature=temperature,
-         max_output_tokens=max_tokens,
-         top_p=top_p,
-         top_k=top_k, 
-         n_batch=n_batch,
-         repeat_penalty = repeat_penalty,
-         n_ctx = n_ctx
-    )
-    
-    return google_palm_model
 
-google_chat_palm = call_palm(google_api_key)
+google_gemini = ChatGoogleGenerativeAI(model="gemini-pro",
+                              tempreature = 0.5,
+                              convert_system_message_to_human=True,
+                              google_api_key=google_api_key
+                              )
 
 chat_openai_gpt3 = ChatOpenAI(temperature=0.5)
 chat_openai_gpt4 = ChatOpenAI(temperature=0.5, model='gpt-4')
@@ -86,7 +52,7 @@ def define_memory(k=7):
 memory = define_memory()
 
 
-def define_conv_chain(memory, llm=google_chat_palm):
+def define_conv_chain(memory, llm=google_gemini):
     
      
     '''
@@ -125,7 +91,7 @@ def define_conv_chain(memory, llm):
 
 def chat(conv_chain, aimodel, message):
     available_models = {
-        'Google PalM 2': google_chat_palm,
+        'Google PalM 2': google_gemini,
         'ChatGPT': chat_openai_gpt3,
         'GPT4': chat_openai_gpt4,
     }
@@ -146,7 +112,7 @@ def chat(conv_chain, aimodel, message):
     response = ans
     return response
 
-initial_conv_chain = define_conv_chain(memory, google_chat_palm)
+initial_conv_chain = define_conv_chain(memory, google_gemini)
 
 def chat_logic(message_list, ai_model):
     # Your existing logic to initialize the conversation chain and interact with the chat model
@@ -156,7 +122,7 @@ def chat_logic(message_list, ai_model):
     elif ai_model == 'GPT4':
         chat_model = define_conv_chain(memory, chat_openai_gpt4)
     elif ai_model == 'Google PalM 2':
-        chat_model = define_conv_chain(memory, google_chat_palm)
+        chat_model = define_conv_chain(memory, google_gemini)
     else:
         # Default to ChatGPT if the provided AI model is invalid
         chat_model = define_conv_chain(memory, chat_openai_gpt3)
@@ -173,4 +139,21 @@ def chat_logic(message_list, ai_model):
         # Fallback to another model or provide a default response
         response = "I'm sorry, I couldn't generate a response at the moment. Please try again later."
     
+    return response
+
+def generate_title_request(message_list):
+    try:
+        openai.api_key = settings.OPENAI_API_KEY
+
+        gpt3_response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
+            messages=[
+                         {"role": "system",
+                          "content": "Summarize and make a very short meaningful title under 24 characters"},
+                     ] + message_list
+        )
+        response = gpt3_response["choices"][0]["message"]["content"].strip()
+
+    except Exception as e:
+        return "Problematic title with error."
     return response

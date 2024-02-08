@@ -10,8 +10,7 @@ from django.contrib.auth import get_user_model
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 # from .tasks import send_gpt_request, generate_title_request
-from .tasks import chat_logic
-
+from .tasks import chat_logic, generate_title_request
 User = get_user_model()
 
 
@@ -35,8 +34,6 @@ class ConversationListCreate(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-
-
 # Retrieve, update, and delete a specific conversation
 class ConversationDetail(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -135,10 +132,22 @@ class MessageCreate(generics.CreateAPIView):
                 message_list.append({"role": "user", "content": msg.content})
             else:
                 message_list.append({"role": "assistant", "content": msg.content})
-
+        
         # Call the chat logic function to get a response
         response = chat_logic(message_list,conversation.ai_model)
 
+        #Genrate title if fist message in conversition
+        conversation = get_object_or_404(Conversation, id=self.kwargs['conversation_id'], user=self.request.user)
+        if conversation.title == "Empty":
+            title = messages[-1].content
+            try:
+                conversation.title = title[:30]
+            except:
+                conversation.title = title
+                
+            conversation.save()
+
+        
         return response, conversation.id, messages[0].id
 
     def create(self, request, *args, **kwargs):
@@ -155,8 +164,10 @@ class MessageCreate(generics.CreateAPIView):
                 in_reply_to_id=last_user_message_id
             )
             message.save()
+ 
 
             headers = self.get_success_headers(serializer.data)
+            
             return Response(
                 {
                     "response": response,
