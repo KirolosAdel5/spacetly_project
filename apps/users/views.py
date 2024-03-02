@@ -37,6 +37,10 @@ import json
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+import requests
+from django.core.files.uploadedfile import SimpleUploadedFile
+from .utils import get_user_region
+from django.contrib.gis.geoip2 import GeoIP2
 
 User = get_user_model()
 
@@ -45,12 +49,18 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = SingUpSerializer
     permission_classes = [IsAdminOrPostOnly]
 
-
     def create(self, request):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-
+            g = GeoIP2()
+            remote_addr = request.META.get('HTTP_X_FORWARDED_FOR')
+            if remote_addr:
+                address = remote_addr.split(',')[-1].strip()
+            else:
+                address = request.META.get('REMOTE_ADDR')
+            country = g.country_code(address)
+            print(country)
             # Generate a 4-digit OTP and store it in the user's profile
             otp = random.randint(1000, 9999)
             user.otp = otp
@@ -104,7 +114,9 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def send_reset_otp(self, request):
         email = request.data.get('email', '')
-        print(email)
+        if not email:  # Check if email is not provided in the request body
+            return Response({'detail': 'Email not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(email=email)
 
@@ -169,6 +181,9 @@ def update_user(request):
     # Check if 'profile_picture' is present in the request data
     if 'profile_picture' in request.data:
         user.profile_picture = request.data['profile_picture']
+    
+    if 'mobile_' in data:
+        user.mobile = data['mobile']
 
     user.save()
     serializer = UserSerializer(user, many=False)
@@ -191,7 +206,7 @@ def forgot_password(request):
     user.profile.save()
     
     host = get_current_host(request)
-    link = "http://localhost:8000/api/reset_password/{token}".format(token=token)
+    link = "{host}api/reset_password/{token}".format(token=token, host=host)
     body = "Your password reset link is : {link}".format(link=link)
     send_mail(
         "Paswword reset from Spacetly",
@@ -199,7 +214,7 @@ def forgot_password(request):
         "Spacetly@gmail.com",
         [data['email']]
     )
-    return Response({'details': 'Password reset sent to {email}'.format(email=data['email'])})
+    return Response({'details': 'Password reset sent to {email}'.format(email=data['email']),'link': link,'token': token,})
 
  
 @api_view(['POST'])
@@ -259,9 +274,7 @@ class GoogleLoginRedirectView(PublicApi):
 
         request.session["google_oauth2_state"] = state
 
-        return Response({"authorization_url": authorization_url})
-
-    
+        return redirect(authorization_url)
 
 class GoogleLoginCallbackView(PublicApi):
         
@@ -276,11 +289,11 @@ class GoogleLoginCallbackView(PublicApi):
                 {"error": "Code and state are required."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        # if state != session_state:
-        #     return Response(
-        #         {"error": "Invalid state parameter."},
-        #         status=status.HTTP_400_BAD_REQUEST
-        #     )
+        if state != session_state:
+            return Response(
+                {"error": "Invalid state parameter."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
             
         
         redirect_uri = settings.GOOGLE_OAUTH2_REDIRECT_URI
@@ -301,18 +314,56 @@ class GoogleLoginCallbackView(PublicApi):
                 {"error": "Email not found in user info."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        #if not found user crete new user
         users_with_email = User.objects.filter(email=email)
+        
         if not users_with_email.exists():
-            return Response(
-                {"error": "User not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            profile_picture_url = user_info.get("picture")
+            if profile_picture_url:
+                response = requests.get(profile_picture_url)
+                if response.status_code == 200:
+                    #upload image from gogle 
+                    profile_picture = SimpleUploadedFile(
+                        name="profile_picture.jpg",
+                        content=response.content,
+                        content_type="image/jpeg"
+                    )
+                    user = User.objects.create(
+                        email=user_info.get("email"),
+                        username=user_info.get("email"),
+                        first_name=user_info.get("given_name"),
+                        last_name=user_info.get("family_name"),
+                        email_verified=True,
+                        profile_picture=profile_picture
+                    )
+                    access_token, refresh_token = service.get_access_and_refresh_tokens(user)
+                    response_data = {
+                        "message": "User created successfully.",
+                        "access_token": str(access_token),
+                        "refresh_token": str(refresh_token),
+                    }
+
+                
+            else:
+                user = User.objects.create(
+                    email=user_info.get("email"),
+                    username=user_info.get("email"),
+                    first_name=user_info.get("given_name"),
+                    last_name=user_info.get("family_name"),
+                    email_verified=True
+                )
+                access_token, refresh_token = service.get_access_and_refresh_tokens(user)
+                response_data = {
+                    "message": "User created successfully.",
+                    "access_token": str(access_token),
+                    "refresh_token": str(refresh_token),
+                }
+
+                    
 
         user = users_with_email.first()
         access_token, refresh_token = service.get_access_and_refresh_tokens(user)
         response_data = {
-            "google_token": str(access_token),
             "access_token": str(access_token),
             "refresh_token": str(refresh_token),
         }

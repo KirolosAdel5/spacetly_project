@@ -14,10 +14,12 @@ class SingUpSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(required=False)
     class Meta:
         model = User
-        fields = ['id', 'name', 'username', 'email', 'password', 'email_verified', 'profile_picture', 'subscription_plan']
+        fields = ['id', 'name', 'username', 'email', 'password', 'email_verified', 'profile_picture', 'subscription_plan','is_staff','is_staff','is_superuser']
         extra_kwargs = {'password': {'write_only': True},
                         'email': {'required': True},
-                        'username': {'read_only': True}
+                        'username': {'read_only': True},
+                        'is_staff': {'read_only': True},
+                        'is_superuser': {'read_only': True},
                         }
 
     def validate_email(self, value):
@@ -68,4 +70,5 @@ class UserSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(required=False)
     class Meta:
         model = User
-        fields = ('username','name' ,'email','profile_picture', 'subscription_plan') 
+        fields = ('username','name' ,'email','profile_picture', 'subscription_plan','is_staff','is_superuser') 
+        

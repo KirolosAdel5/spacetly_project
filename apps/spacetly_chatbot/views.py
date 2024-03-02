@@ -10,7 +10,8 @@ from django.contrib.auth import get_user_model
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 # from .tasks import send_gpt_request, generate_title_request
-from .tasks import chat_logic, generate_title_request
+from .tasks import chat, memory, define_conv_chain , google_gemini, chat_openai_gpt3, chat_openai_gpt4
+from .chat_image import image_genrate
 User = get_user_model()
 
 
@@ -34,6 +35,15 @@ class ConversationListCreate(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def delete(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        deleted_count, _ = queryset.delete()
+        if deleted_count > 0:
+            return Response({"message": "All conversations were successfully removed."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"message": "No conversations to remove."}, status=status.HTTP_404_NOT_FOUND)
+
 # Retrieve, update, and delete a specific conversation
 class ConversationDetail(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -133,9 +143,28 @@ class MessageCreate(generics.CreateAPIView):
             else:
                 message_list.append({"role": "assistant", "content": msg.content})
         
-        # Call the chat logic function to get a response
-        response = chat_logic(message_list,conversation.ai_model)
-
+        #check if ai_model in body and if not set it to default
+        if 'ai_model' in self.request.data:
+            conversation.ai_model = self.request.data['ai_model']
+            conversation.save() 
+        
+        
+        if conversation.ai_model == "ChatGPT":
+            chat_model = define_conv_chain(memory, chat_openai_gpt3)
+        elif conversation.ai_model == "GPT4":
+            chat_model = define_conv_chain(memory, chat_openai_gpt4)
+        elif conversation.ai_model == "Google PalM 2":
+            chat_model = define_conv_chain(memory, google_gemini)
+        elif conversation.ai_model == "ImageGenerator":
+            response = image_genrate(last_user_message)["data"][0]["url"]
+        else:
+            # Default to Google PalM 2 if the provided AI model is invalid
+            chat_model = define_conv_chain(memory, google_gemini)
+            
+        if conversation.ai_model != "ImageGenerator":
+            # Call the chat logic function to get a response
+            response = chat(chat_model, message_list[-1]["content"])
+        
         #Genrate title if fist message in conversition
         conversation = get_object_or_404(Conversation, id=self.kwargs['conversation_id'], user=self.request.user)
         if conversation.title == "Empty":

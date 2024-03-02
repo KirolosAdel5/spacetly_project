@@ -45,7 +45,8 @@ BASE_BACKEND_URL  = os.getenv('DJANGO_BASE_BACKEND_URL')
 BASE_FRONTEND_URL = os.getenv('DJANGO_BASE_FRONTEND_URL')
 GOOGLE_OAUTH2_REDIRECT_URI =  f'{BASE_BACKEND_URL}/api/google-callback/'
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
+# ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -70,13 +71,20 @@ THIRD_PARTY_APPS =[
     'dj_rest_auth.registration',
     'social_django',
     'corsheaders',
+    'mptt',
 
  ]
 
 LOCAL_APPS =[
     'apps.users',
     'apps.spacetly_chatbot',
-
+    'apps.spacetly_articleGenerator',
+    'apps.spacetly_text_rephrase',
+    'apps.spacetly_grammmer_checker',
+    'apps.spacetly_templates',
+    'apps.image_generator',
+    'apps.admin_dash',
+    'apps.ai_document_editor',
  ]
 
 INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -229,5 +237,33 @@ GOOGLE_OAUTH2_CLIENT_SECRET  = os.getenv('DJANGO_GOOGLE_OAUTH2_CLIENT_SECRET')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = ['email', 'profile']
 
 
-GOOGLE_API_KEY = os.getenv('GOOGLE_PALM_API_KEY')
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+]
+
+CORS_ALLOW_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS'
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+GEOIP_PATH = os.path.join(BASE_DIR, 'GeoLite2-Country.mmdb')

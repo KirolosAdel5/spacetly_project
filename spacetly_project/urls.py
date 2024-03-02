@@ -11,6 +11,12 @@ urlpatterns = [
     
     path('api/', include('apps.users.urls',namespace="spacetly_users")),
     path('api/v1/chatbot/', include('apps.spacetly_chatbot.urls',namespace="spacetly_chatbot")),
+    path('api/v1/text-rephrase/', include('apps.spacetly_text_rephrase.urls',namespace="spacetly_text_rephrase")),
+    path('api/v1/grammmer-checker/', include('apps.spacetly_grammmer_checker.urls',namespace="spacetly_grammmer_checker")),
+    path('api/v1/templates/', include('apps.spacetly_templates.urls',namespace="spacetly_templates")),
+    path('api/v1/image-generator/', include('apps.image_generator.urls',namespace="image_generator")),
+    path('api/admin-dash/', include('apps.admin_dash.urls',namespace="admin_dash")),
+    path('api/v1/writing-assistant/', include('apps.ai_document_editor.urls',namespace="ai_document_editor")),
     
 ]
 if settings.DEBUG:

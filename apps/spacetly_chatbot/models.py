@@ -2,12 +2,10 @@ from django.db import models
 from django.conf import settings
 import secrets
 
-
 def generate_secure_random_id():
     min_value = 10 ** 10  # Minimum value of the range (inclusive)
     max_value = 10 ** 11 - 1  # Maximum value of the range (exclusive)
     return secrets.randbelow(max_value - min_value) + min_value
-
 
 class Conversation(models.Model):
     """
@@ -23,6 +21,8 @@ class Conversation(models.Model):
         ('ChatGPT', 'ChatGPT (Free)'),
         ('GPT4', 'GPT4 (Paid)'),
         ('Google PalM 2', 'Google PalM 2 (Paid)'),
+        # Add onther to image generator
+        ('ImageGenerator', 'ImageGenerator'),
     ]
 
     id = models.BigIntegerField(primary_key=True, default=generate_secure_random_id, editable=False)
@@ -33,14 +33,13 @@ class Conversation(models.Model):
     favourite = models.BooleanField(default=False)
     archive = models.BooleanField(default=False)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
-    ai_model = models.CharField(max_length=50, choices=AI_MODEL_CHOICES, default='ChatGPT')
+    ai_model = models.CharField(max_length=50, choices=AI_MODEL_CHOICES, default='Google PalM 2')
 
     class Meta:
         ordering = ['created_at']
 
     def __str__(self):
         return f"Conversation {self.title} - {self.user.username}"
-
 
 class Message(models.Model):
     """
