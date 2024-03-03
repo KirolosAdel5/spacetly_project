@@ -7,6 +7,8 @@ from .views import (
     DocumentFileViewSet,
     DocumentFileDetailViewSet,
     CheckMistakesAPIView,
+    tashkeel_text_APIView,
+    remove_tashkeel_text_APIView,
     read_document_file
 )
 app_name = 'spacetly_grammmer_checker'
@@ -17,7 +19,8 @@ urlpatterns = [
     path('documents/<uuid:unique_id>/', DocumentRetrieveUpdateDestroyAPIView.as_view(), name='document-detail'),
     
     path('check-mistakes/<uuid:unique_id>/', CheckMistakesAPIView.as_view(), name='check-mistakes-by-unique-id'),
-
+    path('tashkeel_text/', tashkeel_text_APIView, name='tashkeel_text'),
+    path('remove_tashkeel_text/', remove_tashkeel_text_APIView, name='remove_tashkeel_text'),
     # DocumentImage URLs
     path('upload/image/<uuid:unique_id>/', DocumentImageViewSet.as_view(), name='upload_image'),
     path('document/<uuid:unique_id>/image/<int:pk>/', DocumentImageDetailViewSet.as_view(), name='document_image_detail'),

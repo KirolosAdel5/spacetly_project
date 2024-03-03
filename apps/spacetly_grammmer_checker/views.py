@@ -1,5 +1,5 @@
 from rest_framework import generics,status,pagination 
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,permission_classes
 from .models import Document, DocumentImage, DocumentFile
 from .serializers import DocumentSerializer, DocumentImageSerializer, DocumentFileSerializer
 from rest_framework.response import Response
@@ -10,7 +10,8 @@ from django.shortcuts import get_object_or_404
 from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
 from rest_framework.permissions import IsAuthenticated
-
+import json
+from adawat import adaat
 class DocumentPagination(pagination.PageNumberPagination):
     page_size = 10
     page_size_query_param = 'page_size'
@@ -24,12 +25,9 @@ class CheckMistakesAPIView(generics.UpdateAPIView):
        
         # Get the text from the request data
         text = request.data.get('content', '')
-                
-        print("kerooooooooooooo",correct_the_grammar_mistakes(text))
-
+        
         # Correct grammar mistakes
-        mistakes =  ast.literal_eval(correct_the_grammar_mistakes(text))
-        print("kerooooooooooooo",mistakes)
+        mistakes =  correct_the_grammar_mistakes(text)
         document.mistakes =  mistakes
 
         # Serialize the updated document data
@@ -40,6 +38,7 @@ class CheckMistakesAPIView(generics.UpdateAPIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class DocumentListCreateAPIView(generics.ListCreateAPIView):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
@@ -136,3 +135,37 @@ def read_pdf(uploaded_file):
             page = reader.pages[page_num]
             text += page.extract_text()
     return text
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def tashkeel_text_APIView(request):
+    if request.method == 'POST':
+        try:
+            text = request.data.get('text')
+            lastmark = True if request.data.get('lastmark') == 'True' else False
+            if text:
+                text_t = adaat.tashkeel_text(text, lastmark)
+                return Response({'tashkeel_text': text_t}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Text field is required'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    else:
+        return Response({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_tashkeel_text_APIView(request):
+    if request.method == 'POST':
+        try:
+            text = request.data.get('text')
+            lastmark = True if request.data.get('lastmark') == 'True' else False
+            if text:
+                text_t = adaat.normalize(text)
+                return Response({'normal_text': text_t}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Text field is required'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    else:
+        return Response({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)

@@ -4,7 +4,7 @@ from langchain_google_genai import GoogleGenerativeAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 import openai
 from dotenv import load_dotenv, find_dotenv
 import os

@@ -6,6 +6,7 @@ from rest_framework.pagination import LimitOffsetPagination
 # from celery.result import AsyncResult
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
+from rest_framework.filters import SearchFilter
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
@@ -29,6 +30,9 @@ class ConversationListCreate(generics.ListCreateAPIView):
     List and create conversations.
     """
     serializer_class = ConversationSerializer
+    filter_backends = [ SearchFilter]
+    search_fields = ['title']
+
 
     def get_queryset(self):
         return Conversation.objects.filter(user=self.request.user).order_by('created_at')
@@ -156,7 +160,7 @@ class MessageCreate(generics.CreateAPIView):
         elif conversation.ai_model == "Google PalM 2":
             chat_model = define_conv_chain(memory, google_gemini)
         elif conversation.ai_model == "ImageGenerator":
-            response = image_genrate(last_user_message)["data"][0]["url"]
+            response = image_genrate(message_list[-1]["content"])
         else:
             # Default to Google PalM 2 if the provided AI model is invalid
             chat_model = define_conv_chain(memory, google_gemini)
