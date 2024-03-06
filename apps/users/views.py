@@ -41,6 +41,7 @@ import requests
 from django.core.files.uploadedfile import SimpleUploadedFile
 from .utils import get_user_region
 from django.contrib.gis.geoip2 import GeoIP2
+import re
 
 User = get_user_model()
 
@@ -173,17 +174,58 @@ def update_user(request):
     data = request.data
 
     user.name = data.get('name', user.name)
-    user.username = data.get('username', user.username)
-
-    if 'password' in data and data['password'] != "":
-        user.password = make_password(data['password'])
-
-    # Check if 'profile_picture' is present in the request data
     if 'profile_picture' in request.data:
         user.profile_picture = request.data['profile_picture']
-    
-    if 'mobile_' in data:
-        user.mobile = data['mobile']
+        if user.profile_picture:
+            user.profile_picture = request.data['profile_picture']
+        else:
+            # Set default profile picture if 'profile_picture' is not provided or empty
+            user.profile_picture = 'default.jpg'
+
+
+    if 'old_password' in data:
+        PASSWORD_PATTERN = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+
+        if 'old_password' in data and 'new_password' in data and 'confirm_password' in data:
+            old_password = data['old_password']
+            new_password = data['new_password']
+            confirm_password = data['confirm_password']
+
+            # Check if the new password and confirm password are not empty
+            if new_password and confirm_password:
+                # Verify that the old password matches the user's current password
+                if user.check_password(old_password):
+                    # Check if the new password is the same as the old password
+                    if new_password != old_password:
+                        # Check if the new password and confirm password match
+                        if new_password == confirm_password:
+                            # Check if the new password meets the strength requirements
+                            if re.match(PASSWORD_PATTERN, new_password):
+                                # Set the new password
+                                user.set_password(new_password)
+                                # Save the user object
+                                user.save()
+                            else:
+                                # Return an error response indicating that the password does not meet the strength requirements
+                                return Response({"error": "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (@$!%*?&)"}, status=status.HTTP_400_BAD_REQUEST)
+                        else:
+                            # Return an error response indicating that the new password and confirm password do not match
+                            return Response({"error": "New password and confirm password do not match"}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        # Return an error response indicating that the new password is the same as the old password
+                        return Response({"error": "New password cannot be the same as the old password"}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # Return an error response indicating that the old password is incorrect
+                    return Response({"error": "Old password is incorrect"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Return an error response indicating that the new password or confirm password is empty
+                return Response({"error": "New password or confirm password cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Return an error response indicating that the required fields are missing
+            return Response({"error": "Old password, new password, and confirm password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if 'phone_number' in data:
+        user.phone_number = data['phone_number']
 
     user.save()
     serializer = UserSerializer(user, many=False)

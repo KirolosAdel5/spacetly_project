@@ -10,7 +10,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from django.conf import settings
 import dotenv
-from .chat_image import image_genrate
+# from .chat_image import image_genrate
 
 dotenv.load_dotenv()
 google_gemini = ChatGoogleGenerativeAI(model="gemini-pro",

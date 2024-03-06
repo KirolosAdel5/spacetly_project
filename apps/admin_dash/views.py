@@ -18,6 +18,8 @@ from django.db.models.functions import ExtractMonth
 import calendar
 from django.db.models import Func, CharField, Value
 from datetime import datetime, timedelta
+import random
+from django.contrib.auth.password_validation import validate_password
 
 
 from django.contrib.auth import get_user_model
@@ -65,7 +67,94 @@ class UserManagementViewSet(generics.ListCreateAPIView):
     search_fields = ['username', 'email', 'name', 'is_staff', 'is_active']
     filterset_fields = ['username', 'email', 'name', 'is_staff', 'is_active']
     ordering_fields = ['username', 'email', 'name', 'is_staff', 'is_active', 'date_joined', 'last_login']
+class UserManagementInfoViewSet(generics.RetrieveUpdateDestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminUser]
 
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data =         {
+            "user_info": serializer.data,
+            "user_genrated" : {
+                "Words_Generated" : random.randint(0, 2500),
+                "Images_Generated" : random.randint(0, 15),
+            },
+            "subscription":{
+                "is_subscribed" : random.choice([True, False]),
+                "subscription_type" : random.choice(["Free", "Basic", "Standard", "Premium"]),
+                "subscription_price" : 0.00,
+                #Total words available: 100 . Total prepaid words available 0.
+                "total_words_available" : 100,
+                "prepaid_words_available":0,
+                "percentage": random.randint(0, 100),
+            },
+            "words_images_generated_graph":{
+                "month": calendar.month_abbr[1:],
+                "words_generated": [random.randint(0, 2500) for i in range(1, 13)],
+                "images_generated": [random.randint(0, 15) for i in range(1, 13)],
+            },
+            "transactions":[
+                {
+                    "order_id": "RxJFnhms8h",
+                    "status": "Completed",
+                    "plan_name": "Free",
+                    "price": 100.0,
+                    "Gateway": "PayPal",
+                    "paid_on_date": "05 Mar 2024",
+                    "paid_on_time": "03:18 AM",
+                    "Pricing Plan": "Monthly"
+                },
+                {
+            "order_id": "RxJFnhms8h",
+            "status": "Pending",
+            "plan_name": "Premium",
+            "price": 300.0,
+            "Gateway": "PayPal",
+            "paid_on_date": "05 Mar 2024",
+            "paid_on_time": "03:18 AM",
+            "Pricing Plan": "Monthly"
+                },                
+            ]
+            
+        }
+
+        return Response(data)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if 'new_password' in request.data:
+            new_password = request.data['new_password']
+            confirm_new_password = request.data['confirm_new_password']
+            
+            if not (new_password == confirm_new_password):
+                return Response({'new_password': 'Passwords do not match.'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                validate_password(new_password, instance)
+                instance.set_password(new_password)
+                instance.save()
+            except :
+                return Response({'new_password': 'Password is not strong enough.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def perform_destroy(self, instance):
+        instance.delete()
 class WordCount(Func):
     function = 'regexp_split_to_array'
     template = "%(function)s(%(expressions)s, '\\s+')"
@@ -557,3 +646,73 @@ class AdminDashboardViewSet(generics.GenericAPIView):
         }
 
         return Response(data, status=status.HTTP_200_OK)
+
+
+class TransactionViewSet(generics.ListAPIView):
+    pagination_class = LastUsersPagination
+    permission_classes = [IsAdminUser]
+
+    
+    def get_queryset(self):
+        transactions = []
+        #loop to display last 10 transactions
+        for i in range(12):
+            transactions.append(
+                                {
+                    'order_id' : 'RxJFnhms8h',
+                    'user_info' : {
+                        'id' : 1,
+                        'profile_picture' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=387&q=80',
+                        'username' : 'John Doe',
+                        'email' : 'p8wH6@example.com',
+                        'country': 'USA',
+                    },
+                    'status' : 'Completed',
+                    'plan_name' : 'Free',
+                    'words_included' : random.randint(100, 1000),
+                    'price' : random.randint(200, 400),
+                    'Gateway' : 'PayPal',
+                    'paid_on_date' :timezone.now().strftime("%d %b %Y"),
+                    'paid_on_time' :timezone.now().strftime("%I:%M %p"),
+                    'Pricing Plan': 'Monthly',
+                    'Payment Frequency': random.choice(['Prepaid', 'On-demand','Postpaid', 'Annual']),
+                    
+                },
+            )
+        return  transactions
+
+    def get(self, request, *args, **kwargs):
+            queryset = self.get_queryset()
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                return self.get_paginated_response(page)
+            return Response(queryset)
+        
+        
+#TransactionInfoViewSet
+class TransactionInfoViewSet(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        return  {
+                    'order_id' : 'RxJFnhms8h',
+                    'user_info' : {
+                        'id' : 1,
+                        'username' : 'John Doe',
+                        'email' : 'p8wH6@example.com',
+                        'country': 'USA',
+                    },
+                    'status' : 'Completed',
+                    'plan_name' : 'Free',
+                    'words_included' : random.randint(100, 1000),
+                    'price' : random.randint(200, 400),
+                    'Gateway' : 'PayPal',
+                    'paid_on_date' :timezone.now().strftime("%d %b %Y"),
+                    'paid_on_time' :timezone.now().strftime("%I:%M %p"),
+                    'Pricing Plan': 'Monthly',
+                    'Payment Frequency': random.choice(['Prepaid', 'On-demand','Postpaid', 'Annual']),
+                    
+                }
+    def get(self, request, *args, **kwargs):
+            queryset = self.get_queryset()
+            return Response(queryset)

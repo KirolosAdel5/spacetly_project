@@ -1,8 +1,8 @@
-from rest_framework import viewsets ,status
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 # Create your views here.
-from .models import Image_Gene
+from .models import Image_Gene 
 from .serializers import ImageGeneSerializer
 from .tasks import image_genrate
 from rest_framework.permissions import IsAuthenticated  
@@ -22,7 +22,7 @@ class ImageGeneCreateView(APIView):
             # Save the instance
             image_gene_instance = serializer.save(created_by=request.user)
             # Assuming 'topic', 'style', 'num_of_images', and 'resolution' are provided in the request
-            images = image_genrate(image_gene_instance.prompt, image_gene_instance.style, image_gene_instance.num_of_image, image_gene_instance.resolution)
+            images = image_genrate(image_gene_instance.prompt)
             # Construct dictionary with UUIDs as keys and URLs as values
             image_paths_dict = images
             # Assign the image_paths dictionary to the image_paths field of the instance
@@ -42,52 +42,52 @@ class RetrieveSpecificImageView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, image_id):
-        image = get_object_or_404(Image_Gene, id=image_id)
+        image = get_object_or_404(Image_Gene, id=image_id, created_by=request.user)
         serializer = ImageGeneSerializer(image)
         return Response(serializer.data)
     
 class RemoveImageView(APIView):
     permission_classes = [IsAuthenticated]
     def delete(self, request, image_id):
-        image = get_object_or_404(Image_Gene, id=image_id ) 
+        image = get_object_or_404(Image_Gene, id=image_id , created_by=request.user) 
         image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class RetrieveSingleImageView(APIView):
-    permission_classes = [IsAuthenticated]
+# class RetrieveSingleImageView(APIView):
+#     permission_classes = [IsAuthenticated]
 
-    def get(self, request, image_id, pk):
-        # Retrieve the image instance using the UUID
-        image = get_object_or_404(Image_Gene, id=image_id)
+#     def get(self, request, image_id, pk):
+#         # Retrieve the image instance using the UUID
+#         image = get_object_or_404(Image_Gene, id=image_id)
         
-        # Get the image paths dictionary
-        image_paths = image.image_paths
+#         # Get the image paths dictionary
+#         image_paths = image.image_paths
         
-        # Get the URL corresponding to the image UUID
-        image_url = image_paths.get(str(pk))
+#         # Get the URL corresponding to the image UUID
+#         image_url = image_paths.get(str(pk))
         
-        if image_url:
-            return Response({"image_url": image_url})
-        else:
-            return Response({"error": "Image not found"}, status=status.HTTP_404_NOT_FOUND)
+#         if image_url:
+#             return Response({"image_url": image_url})
+#         else:
+#             return Response({"error": "Image not found"}, status=status.HTTP_404_NOT_FOUND)
 
-class DeleteSingleImageView(APIView):
-    permission_classes = [IsAuthenticated]
+# class DeleteSingleImageView(APIView):
+#     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, image_id, pk):
-        # Retrieve the image instance using the UUID
-        image = get_object_or_404(Image_Gene, id=image_id)
+#     def delete(self, request, image_id, pk):
+#         # Retrieve the image instance using the UUID
+#         image = get_object_or_404(Image_Gene, id=image_id)
         
-        # Get the image paths dictionary
-        image_paths = image.image_paths
+#         # Get the image paths dictionary
+#         image_paths = image.image_paths
         
-        # Remove the entry corresponding to the image UUID
-        if str(pk) in image_paths:
-            del image_paths[str(pk)]
-            # Save the updated image instance
-            image.save()
-            return Response({"message": "Image removed successfully"}, status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response({"error": "Image not found"}, status=status.HTTP_404_NOT_FOUND)
+#         # Remove the entry corresponding to the image UUID
+#         if str(pk) in image_paths:
+#             del image_paths[str(pk)]
+#             # Save the updated image instance
+#             image.save()
+#             return Response({"message": "Image removed successfully"}, status=status.HTTP_204_NO_CONTENT)
+#         else:
+#             return Response({"error": "Image not found"}, status=status.HTTP_404_NOT_FOUND)
 

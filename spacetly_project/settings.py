@@ -266,4 +266,3 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-GEOIP_PATH = os.path.join(BASE_DIR, 'GeoLite2-Country.mmdb')

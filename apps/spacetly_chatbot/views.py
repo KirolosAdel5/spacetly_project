@@ -12,7 +12,7 @@ from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 # from .tasks import send_gpt_request, generate_title_request
 from .tasks import chat, memory, define_conv_chain , google_gemini, chat_openai_gpt3, chat_openai_gpt4
-from .chat_image import image_genrate
+# from .chat_image import image_genrate
 User = get_user_model()
 
 
@@ -46,7 +46,7 @@ class ConversationListCreate(generics.ListCreateAPIView):
         if deleted_count > 0:
             return Response({"message": "All conversations were successfully removed."}, status=status.HTTP_200_OK)
         else:
-            return Response({"message": "No conversations to remove."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "No conversations to remove."}, status=status.HTTP_204_NO_CONTENT)
 
 # Retrieve, update, and delete a specific conversation
 class ConversationDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -160,7 +160,8 @@ class MessageCreate(generics.CreateAPIView):
         elif conversation.ai_model == "Google PalM 2":
             chat_model = define_conv_chain(memory, google_gemini)
         elif conversation.ai_model == "ImageGenerator":
-            response = image_genrate(message_list[-1]["content"])
+            # response = image_genrate(message_list[-1]["content"])
+            response = "this feature is not yet available"
         else:
             # Default to Google PalM 2 if the provided AI model is invalid
             chat_model = define_conv_chain(memory, google_gemini)

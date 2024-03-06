@@ -17,7 +17,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
     country = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = User
-        fields = ['id', 'name', 'username', 'email', 'email_verified', 'profile_picture', 'subscription_plan','is_staff','is_active','date_joined_date', 'date_joined_time','words_left', 'images_left', 'country']
+        fields = ['id', 'name', 'username', 'email', 'email_verified', 'profile_picture','phone_number', 'subscription_plan','is_staff','is_active','date_joined_date', 'date_joined_time','words_left', 'images_left', 'country']
         extra_kwargs = {'password': {'write_only': True},
                         'email': {'required': True},
                         'username': {'read_only': True}

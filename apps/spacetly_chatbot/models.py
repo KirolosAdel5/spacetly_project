@@ -22,7 +22,7 @@ class Conversation(models.Model):
         ('GPT4', 'GPT4 (Paid)'),
         ('Google PalM 2', 'Google PalM 2 (Paid)'),
         # Add onther to image generator
-        ('ImageGenerator', 'ImageGenerator'),
+        # ('ImageGenerator', 'ImageGenerator'),
     ]
 
     id = models.BigIntegerField(primary_key=True, default=generate_secure_random_id, editable=False)
