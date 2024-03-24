@@ -74,7 +74,7 @@ class Template(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     icon = models.ImageField(upload_to='template_icons', null=True, blank=True)
     slug = models.SlugField(unique=True, max_length=255, blank=True)
-
+    created_at = models.DateTimeField(auto_now_add=True,null=True)
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
@@ -84,12 +84,14 @@ class Template(models.Model):
         return self.title
 class TemplateSpecificationField(models.Model):
     TEXT = 'text'
+    TEXTAREA = 'textarea'
     IMAGE = 'image'
     FILE = 'file'
     FIELD_TYPE_CHOICES = [
         (TEXT, 'Text'),
         (IMAGE, 'Image'),
         (FILE, 'File'),
+        (TEXTAREA, 'Textarea'),
     ]
     template = models.ForeignKey(Template, on_delete=models.CASCADE, related_name='specification_values')
     specification = models.ForeignKey(TemplateSpecification, on_delete=models.CASCADE, related_name='fields')
@@ -101,13 +103,6 @@ class TemplateSpecificationField(models.Model):
     def __str__(self):
         return self.name
 
-class FavoriteTemplate(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    template = models.ForeignKey(Template, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"{self.user.username}'s favorite: {self.template.name}"
-
 #user tamplate 
 class UserTemplate(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -115,16 +110,32 @@ class UserTemplate(models.Model):
     template = models.ForeignKey(Template, on_delete=models.CASCADE)
     
     input_data = models.JSONField()  # Store user's input data as JSON
-    output_data = models.TextField()  # Store the output of executing the template
+    content = models.TextField(blank=True)  # Store the output of executing the template
     
-    language = models.CharField(max_length=100)  # Common field: Language
-    target_audience = models.CharField(max_length=100)  # Common field: Target Audience
+    language = models.CharField(max_length=100, default='en')  # Common field: Language
+    target_audience = models.CharField(max_length=100, default='all')  # Common field: Target Audience
     num_of_results = models.IntegerField(default=10)  # Common field: Number of Results
-    tone_of_voice = models.CharField(max_length=100)  # Common field: Tone of Voice
-
+    tone_of_voice = models.CharField(max_length=100, default='neutral')  # Common field: Tone of Voice
     
+    document = models.ForeignKey('ai_document_editor.Document', on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.username}'s {self.template.title} Template"
+    
+    class Meta:
+        ordering = ['-created_at']
+
+
+class FavoriteTemplate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    template = models.ForeignKey(Template, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True,null=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s {self.template.title} Template"
+    
+    

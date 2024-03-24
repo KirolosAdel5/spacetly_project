@@ -17,8 +17,11 @@ urlpatterns = [
     path('api/v1/image-generator/', include('apps.image_generator.urls',namespace="image_generator")),
     path('api/admin-dash/', include('apps.admin_dash.urls',namespace="admin_dash")),
     path('api/v1/writing-assistant/', include('apps.ai_document_editor.urls',namespace="ai_document_editor")),
+    path('api/v1/chat-doc/', include('apps.chat_docs.urls',namespace="chat_docs")),
+    path('api/v1/spacetly_articleGenerator/', include('apps.spacetly_articleGenerator.urls',namespace="spacetly_articleGenerator")),
+    path('api/v1/mutqin_assistant/', include('apps.mutqin_assistant.urls',namespace="mutqin_assistant")),
     
-]
+    ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

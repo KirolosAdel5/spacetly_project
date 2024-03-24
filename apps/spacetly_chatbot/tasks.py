@@ -10,6 +10,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 from django.conf import settings
 import dotenv
+import time
 # from .chat_image import image_genrate
 
 dotenv.load_dotenv()
@@ -84,8 +85,10 @@ def chat(conv_chain, message):
 
     ans = conv_chain.predict(input=message)
     return ans
-
-
+start = time.time() 
+print(chat(define_conv_chain(memory, chat_openai_gpt3), "عرفني بنفسك"))
+end = time.time()
+print(end - start)
 # def chat_logic(message_list, ai_model):
 #     # Your existing logic to initialize the conversation chain and interact with the chat model
 #     last_user_message = message_list[-1]["content"]

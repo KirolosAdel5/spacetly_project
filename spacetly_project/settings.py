@@ -85,6 +85,8 @@ LOCAL_APPS =[
     'apps.image_generator',
     'apps.admin_dash',
     'apps.ai_document_editor',
+    'apps.chat_docs',
+    'apps.mutqin_assistant',
  ]
 
 INSTALLED_APPS = DEFAULT_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -240,6 +242,10 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = ['email', 'profile']
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+FACEBOOK_APP_ID = os.getenv('FACEBOOK_APP_ID')
+FACEBOOK_APP_SECRET = os.getenv('FACEBOOK_APP_SECRET')
+FACEBOOK_REDIRECT_URI = f'{BASE_BACKEND_URL}/api/facebook-callback/'
+FACEBOOK_OAUTH2_REDIRECT_URI = f'{BASE_BACKEND_URL}/api/facebook-callback/'
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',

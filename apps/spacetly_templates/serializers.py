@@ -5,11 +5,11 @@ from .models import (
     TemplateSpecification, 
     TemplateSpecificationField, 
     TemplateType, 
-    FavoriteTemplate,
     UserTemplate,
+    FavoriteTemplate,
     )
 
-
+from .utils import time_since
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -29,16 +29,24 @@ class TemplateSpecificationSerializer(serializers.ModelSerializer):
 
 
 class TemplateSpecificationFieldSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    title = serializers.CharField(source='name')  # Map 'name' field to 'title'
     class Meta:
         model = TemplateSpecificationField
-        fields = '__all__'
+        fields = ['id', 'name', 'title', 'description', 'is_required', 'field_type','template']
+        
+    def get_name(self, obj):
+        return obj.specification.name
 
 class TemplateSerializer(serializers.ModelSerializer):
     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
-
+    category__name = serializers.SerializerMethodField()
     class Meta:
         model = Template
-        fields = '__all__'
+        fields = ['id', 'title', 'description', 'icon','slug', 'category','category__name', 'created_by', 'is_active','template_type']
+
+    def get_category__name(self, obj):
+        return obj.category.name
         
     def create(self, validated_data):
         # Get the authenticated user from the request if available
@@ -56,11 +64,16 @@ class FavoriteTemplateSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class UserTemplateSerializer(serializers.ModelSerializer):
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+
     class Meta:
         model = UserTemplate
         fields = '__all__'
         #not reuried 
-        read_only_fields = ['user', 'template']
+        read_only_fields = ['user', 'template', 'input_data','content']
+        
 
     def create(self, validated_data):
         # Automatically set the user to the currently authenticated user
@@ -82,3 +95,14 @@ class UserTemplateSerializer(serializers.ModelSerializer):
         # Perform the default create behavior
         return super().create(validated_data)
 
+    def get_created_at(self, obj):
+        return time_since(obj.created_at)
+
+    def get_updated_at(self, obj):
+        return time_since(obj.updated_at)
+    
+    def get_title(self, obj):
+        if obj.document : 
+            return obj.document.title
+        return None
+    

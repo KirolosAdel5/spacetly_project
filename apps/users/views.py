@@ -31,7 +31,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import redirect
 from social_django.utils import load_strategy
 
-from .services import GoogleRawLoginFlowService
+from .services import GoogleRawLoginFlowService,FacebookRawLoginFlowService
 
 import json
 from django.utils.decorators import method_decorator
@@ -39,9 +39,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import requests
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .utils import get_user_region
-from django.contrib.gis.geoip2 import GeoIP2
 import re
+from django.core.exceptions import ImproperlyConfigured
+from attrs import define
 
 User = get_user_model()
 
@@ -54,14 +54,6 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            g = GeoIP2()
-            remote_addr = request.META.get('HTTP_X_FORWARDED_FOR')
-            if remote_addr:
-                address = remote_addr.split(',')[-1].strip()
-            else:
-                address = request.META.get('REMOTE_ADDR')
-            country = g.country_code(address)
-            print(country)
             # Generate a 4-digit OTP and store it in the user's profile
             otp = random.randint(1000, 9999)
             user.otp = otp
@@ -82,7 +74,16 @@ class UserViewSet(viewsets.ModelViewSet):
             }
 
             return Response({'user': serializer.data, 'tokens': token_data}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            email_errors = serializer.errors.get('email', [])
+            password_errors = serializer.errors.get('password', [])
+
+            if email_errors:
+                return Response({'message': email_errors[0]}, status=status.HTTP_400_BAD_REQUEST)
+            elif password_errors:
+                return Response({'message': password_errors[0]}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'])
     def confirm_email(self, request):
@@ -92,31 +93,29 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user = User.objects.get(pk=str(user_id))
             if user.email_verified:
-                return Response({'detail': 'Email already confirmed.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'تم تاكيد البريد الالكتروني من قبل'}, status=status.HTTP_400_BAD_REQUEST)
 
             if user.otp == int(otp) and self.is_otp_valid(user.otp_created_at):
                 user.email_verified = True
                 user.save()
-                return Response({'detail': 'Email confirmed successfully.'}, status=status.HTTP_200_OK)
+                return Response({'message': 'تم تاكيد البريد الالكتروني بنجاح'}, status=status.HTTP_200_OK)
             else:
-                return Response({'detail': 'Unable to verify your email address.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'الكود الذي ادخلته غير صالح'}, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
-            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-        except ValueError:
-            return Response({'detail': 'Invalid user ID.'}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response({'message': 'المستخدم غير موجود'}, status=status.HTTP_404_NOT_FOUND)
+        
     def is_otp_valid(self, otp_created_at):
         # Check if the OTP is still valid based on the expiration time
         if otp_created_at:
-            expiration_time = otp_created_at + timezone.timedelta(minutes=5)
-            return timezone.now() <= expiration_time
+            return otp_created_at <=  otp_created_at + timedelta(hours=2)
         return False
+
     
     @action(detail=False, methods=['post'])
     def send_reset_otp(self, request):
         email = request.data.get('email', '')
         if not email:  # Check if email is not provided in the request body
-            return Response({'detail': 'Email not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': 'الايميل مطلوب.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = User.objects.get(email=email)
@@ -132,9 +131,9 @@ class UserViewSet(viewsets.ModelViewSet):
             message = f'Your reset OTP is: {otp}'
             user.email_user(subject, message)
 
-            return Response({'detail': 'Reset OTP sent successfully.'}, status=status.HTTP_200_OK)
+            return Response({'message': 'تم ارسال الكود الجديد بنجاح'}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': 'المستخدم غير موجود'}, status=status.HTTP_404_NOT_FOUND)
 
     # @action(detail=False, methods=['post'], url_path='login')
     # def login(self, request):
@@ -183,7 +182,7 @@ def update_user(request):
             user.profile_picture = 'default.jpg'
 
 
-    if 'old_password' in data:
+    if 'old_password' in data or 'password' in data:
         PASSWORD_PATTERN = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
 
         if 'old_password' in data and 'new_password' in data and 'confirm_password' in data:
@@ -207,22 +206,22 @@ def update_user(request):
                                 user.save()
                             else:
                                 # Return an error response indicating that the password does not meet the strength requirements
-                                return Response({"error": "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (@$!%*?&)"}, status=status.HTTP_400_BAD_REQUEST)
+                                return Response({"message": "يجب ان كلمة المرور تحتوي على حروف كبيرة وصغيرة ورقم ورمز واحد على الاقل"}, status=status.HTTP_400_BAD_REQUEST)
                         else:
                             # Return an error response indicating that the new password and confirm password do not match
-                            return Response({"error": "New password and confirm password do not match"}, status=status.HTTP_400_BAD_REQUEST)
+                            return Response({"message": "كلمة المرور غير متطابقة"}, status=status.HTTP_400_BAD_REQUEST)
                     else:
                         # Return an error response indicating that the new password is the same as the old password
-                        return Response({"error": "New password cannot be the same as the old password"}, status=status.HTTP_400_BAD_REQUEST)
+                        return Response({"message": "كلمة المرور الجديدة يجب ان تكون مختلفة"}, status=status.HTTP_400_BAD_REQUEST)
                 else:
                     # Return an error response indicating that the old password is incorrect
-                    return Response({"error": "Old password is incorrect"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"message": "كلمة المرور القديمة غير صحيح"}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 # Return an error response indicating that the new password or confirm password is empty
-                return Response({"error": "New password or confirm password cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "يرجى تعبئة كلمة المرور الجديدة وتأكيد كلمة المرور"}, status=status.HTTP_400_BAD_REQUEST)
         else:
             # Return an error response indicating that the required fields are missing
-            return Response({"error": "Old password, new password, and confirm password are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Old password, new password, and confirm password are required"}, status=status.HTTP_400_BAD_REQUEST)
 
     if 'phone_number' in data:
         user.phone_number = data['phone_number']
@@ -247,13 +246,13 @@ def forgot_password(request):
     user.profile.reset_password_expire = expire_date
     user.profile.save()
     
-    host = get_current_host(request)
-    link = "{host}api/reset_password/{token}".format(token=token, host=host)
+    # host = get_current_host(request)
+    link = "https://auth.mutqinai.com/#/newpassword/{token}".format(token=token)
     body = "Your password reset link is : {link}".format(link=link)
     send_mail(
-        "Paswword reset from Spacetly",
+        "Paswword reset from  mutqinai.com",
         body,
-        "Spacetly@gmail.com",
+        "info@mutqinai.com",
         [data['email']]
     )
     return Response({'details': 'Password reset sent to {email}'.format(email=data['email']),'link': link,'token': token,})
@@ -266,20 +265,20 @@ def reset_password(request,token):
         user = User.objects.get(profile__reset_password_token=token)
     except User.DoesNotExist:
         return Response(
-            {'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST
+            {'message': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST
         )
     if user.profile.reset_password_expire.replace(tzinfo=None) < datetime.now():
-        return Response({'error': 'Token is expired'},status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': 'الرابط منتهي'},status=status.HTTP_400_BAD_REQUEST)
     
     if data['password'] != data['confirmPassword']:
-        return Response({'error': 'Password are not same'},status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': 'كلمة المرور غير متطابقة'},status=status.HTTP_400_BAD_REQUEST)
     
     user.password = make_password(data['password'])
     user.profile.reset_password_token = ""
     user.profile.reset_password_expire = None 
     user.profile.save() 
     user.save()
-    return Response({'details': 'Password reset done '})
+    return Response({'message': 'تم تغيير كلمة المرور بنجاح'})
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -292,6 +291,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             user = None
 
         if user is not None and user.check_password(password):
+            if not user.is_active:
+                return Response({'message': 'تم تعطيل حسابك'}, status=status.HTTP_403_FORBIDDEN)
+
+            if not user.email_verified:
+                return Response({'user_id': user.id,'message': 'يرجي تفعيل البريد الالكتروني'}, status=status.HTTP_403_FORBIDDEN)
+            
             refresh = RefreshToken.for_user(user)
             data = {
                 'refresh': str(refresh),
@@ -301,8 +306,41 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             django_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
             return Response({'user': UserSerializer(user).data, 'tokens': data}, status=status.HTTP_200_OK)
+        #check if email not exist
+        elif user is None:
+            return Response({'message': 'لم يتم العثور على البريد الالكتروني'}, status=status.HTTP_401_UNAUTHORIZED)
+            
         else:
-            return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'message': 'خطاء في البريد الالكتروني او كلمة المرور'}, status=status.HTTP_401_UNAUTHORIZED)
+
+@define
+class GoogleRawLoginCredentials:
+    client_id: str
+    client_secret: str
+    project_id: str
+
+def google_raw_login_get_credentials() -> GoogleRawLoginCredentials:
+    client_id = settings.GOOGLE_OAUTH2_CLIENT_ID
+    client_secret = settings.GOOGLE_OAUTH2_CLIENT_SECRET
+    project_id = settings.GOOGLE_OAUTH2_PROJECT_ID
+
+    if not client_id:
+        raise ImproperlyConfigured("GOOGLE_OAUTH2_CLIENT_ID missing in env.")
+
+    if not client_secret:
+        raise ImproperlyConfigured("GOOGLE_OAUTH2_CLIENT_SECRET missing in env.")
+
+    if not project_id:
+        raise ImproperlyConfigured("GOOGLE_OAUTH2_PROJECT_ID missing in env.")
+
+    credentials = GoogleRawLoginCredentials(
+        client_id=client_id,
+        client_secret=client_secret,
+        project_id=project_id
+    )
+
+    return credentials
+   
 
 class PublicApi(APIView):
     authentication_classes = ()
@@ -328,12 +366,12 @@ class GoogleLoginCallbackView(PublicApi):
         
         if code is None or state is None:
             return Response(
-                {"error": "Code and state are required."}, 
+                {"message": "Code and state are required."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         if state != session_state:
             return Response(
-                {"error": "Invalid state parameter."},
+                {"message": "Invalid state parameter."},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -343,7 +381,7 @@ class GoogleLoginCallbackView(PublicApi):
         
         if "access_token" not in credentials:
             return Response(
-                {"error": "Access token not found in response."},
+                {"message": "Access token not found in response."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -353,13 +391,13 @@ class GoogleLoginCallbackView(PublicApi):
         email = user_info.get("email")
         if not email:
             return Response(
-                {"error": "Email not found in user info."},
+                {"message": "الايميل غير موجود"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         #if not found user crete new user
         users_with_email = User.objects.filter(email=email)
         
-        if not users_with_email.exists():
+        if not users_with_email.exists():   
             profile_picture_url = user_info.get("picture")
             if profile_picture_url:
                 response = requests.get(profile_picture_url)
@@ -374,7 +412,7 @@ class GoogleLoginCallbackView(PublicApi):
                         email=user_info.get("email"),
                         username=user_info.get("email"),
                         first_name=user_info.get("given_name"),
-                        last_name=user_info.get("family_name"),
+                        last_name=user_info.get("family_name", ""),
                         email_verified=True,
                         profile_picture=profile_picture
                     )
@@ -384,14 +422,13 @@ class GoogleLoginCallbackView(PublicApi):
                         "access_token": str(access_token),
                         "refresh_token": str(refresh_token),
                     }
-
-                
+            
             else:
                 user = User.objects.create(
                     email=user_info.get("email"),
                     username=user_info.get("email"),
                     first_name=user_info.get("given_name"),
-                    last_name=user_info.get("family_name"),
+                    last_name=user_info.get("family_name", ""),
                     email_verified=True
                 )
                 access_token, refresh_token = service.get_access_and_refresh_tokens(user)
@@ -413,8 +450,93 @@ class GoogleLoginCallbackView(PublicApi):
         user.last_login = datetime.now()
         user.save()
         
-        return Response(response_data, status=status.HTTP_200_OK)
-    
+        front_page_url = 'http://auth.mutqinai.com/#/control'
+        redirect_url = f"{front_page_url}?access_token={str(access_token)}&refresh_token={str(refresh_token)}"
+        return redirect(redirect_url)
+
+        # return Response(response_data, status=status.HTTP_200_OK)
+
+class FacebookLoginRedirectView(PublicApi):
+    def get(self, request, *args, **kwargs):
+        facebook_login_flow = FacebookRawLoginFlowService()
+        authorization_url = facebook_login_flow.get_authorization_url()
+        request.session["facebook_oauth2_state"] = facebook_login_flow.state
+        return redirect(authorization_url)
+
+class FacebookLoginCallbackView(PublicApi):
+    def get(self, request, *args, **kwargs):
+        service = FacebookRawLoginFlowService()
+        code = request.GET.get("code")
+        state = request.GET.get("state")
+        session_state = request.session.get("facebook_oauth2_state")
+        
+        if code is None or state is None:
+            return Response(
+                {"message": "Code and state are required."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if state != session_state:
+            return Response(
+                {"message": "Invalid state parameter."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        redirect_uri = settings.FACEBOOK_OAUTH2_REDIRECT_URI
+        credentials = service.get_access_token(code)
+        
+        if "access_token" not in credentials:
+            return Response(
+                {"message": "Access token not found in response."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        access_token = credentials["access_token"]
+        user_info = service.get_user_info(access_token)
+
+        email = user_info.get("email")
+        if not email:
+            return Response(
+                {"message": "Email not found."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Process user creation or login logic
+        users_with_email = User.objects.filter(email=email)
+        
+        if not users_with_email.exists():   
+            # User doesn't exist, create a new user
+            user = User.objects.create(
+                email=user_info.get("email"),
+                username=user_info.get("email"),
+                first_name=user_info.get("given_name"),
+                last_name=user_info.get("family_name", ""),
+                email_verified=True
+            )
+            # Additional processing if needed
+            
+            # Example response data:
+            access_token, refresh_token = service.get_access_and_refresh_tokens(user)
+            response_data = {
+                "message": "User created successfully.",
+                "access_token": str(access_token),
+            }
+        else:
+            # User already exists, perform login logic
+            user = users_with_email.first()
+            access_token, refresh_token = service.get_access_and_refresh_tokens(user)
+            response_data = {
+                "access_token": str(access_token),
+            }
+        
+        # Save last login time
+        user.last_login = datetime.now()
+        user.save()
+        
+        # Redirect or respond with data
+        front_page_url = 'http://localhost:8000/control'
+        redirect_url = f"{front_page_url}?access_token={str(access_token)}&refresh_token={str(refresh_token)}"
+        return redirect(redirect_url)
+
 class APILogoutView(APIView):
     permission_classes = (IsAuthenticated,)
 
@@ -437,12 +559,12 @@ class APILogoutView(APIView):
 def set_user_permissions(request, username):
     # Check if the requesting user is a superuser or staff
     if not (request.user.is_superuser or request.user.is_staff):
-        return Response({"error": "You do not have permission to perform this action"}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"message": "ليس لديك صلاحيات لتغيير صلاحيات المستخدم"}, status=status.HTTP_403_FORBIDDEN)
 
     try:
         user = User.objects.get(username=username)
     except User.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"message": "المستخدم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data
     is_staff = data.get('is_staff', False)

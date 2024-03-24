@@ -28,7 +28,9 @@ class TextListCreate(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = 'unique_id'  # Specify the lookup field as unique_id
     pagination_class = LastMessagesPagination
-        
+    
+    def get_queryset(self):
+        return Text.objects.filter(created_by=self.request.user).order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
         # Generate a random UUID

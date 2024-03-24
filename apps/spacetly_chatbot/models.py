@@ -55,7 +55,7 @@ class Message(models.Model):
     is_from_user = models.BooleanField(default=True)
     in_reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='replies')
 
-  
+    reloaded_message = models.JSONField(blank=True, null=True, default=list)
     class Meta:
         ordering = ['-created_at']
 

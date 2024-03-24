@@ -14,7 +14,7 @@ class SingUpSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(required=False)
     class Meta:
         model = User
-        fields = ['id', 'name', 'username', 'email', 'password', 'email_verified', 'profile_picture', 'subscription_plan','is_staff','is_staff','is_superuser']
+        fields = ['id', 'name', 'username', 'email', 'password', 'email_verified', 'profile_picture', 'subscription_plan','is_staff','is_active','is_superuser','region']
         extra_kwargs = {'password': {'write_only': True},
                         'email': {'required': True},
                         'username': {'read_only': True},
@@ -41,6 +41,10 @@ class SingUpSerializer(serializers.ModelSerializer):
         name = validated_data['name']
         email = validated_data['email']
         password = validated_data['password']
+        if 'region' in validated_data:
+            region = validated_data['region']
+        else:
+            region = None
 
         # Generate a unique username if the provided name already exists as a username
        
@@ -58,7 +62,8 @@ class SingUpSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             name,
             email,
-            password
+            password,
+            region=region,
         )
         user.name = validated_data['name']
         user.save()
@@ -70,5 +75,5 @@ class UserSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(required=False)
     class Meta:
         model = User
-        fields = ('username','name' ,'email','profile_picture','phone_number', 'subscription_plan','is_staff','is_superuser') 
+        fields = ('id','username','name' ,'email','profile_picture','phone_number', 'subscription_plan','is_staff','is_active','is_superuser','region') 
         

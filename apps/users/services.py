@@ -61,3 +61,47 @@ class GoogleRawLoginFlowService:
         access_token = token_data.access_token
         refresh_token = RefreshToken.for_user(user)
         return access_token, refresh_token
+    
+    
+class FacebookRawLoginFlowService:
+    def __init__(self):
+        self.client_id = settings.FACEBOOK_APP_ID
+        self.client_secret = settings.FACEBOOK_APP_SECRET
+        self.redirect_uri = settings.FACEBOOK_REDIRECT_URI
+        self.state = 'your_custom_state'  # Replace with your state logic
+
+    def get_authorization_url(self):
+        params = {
+            'client_id': self.client_id,
+            'redirect_uri': self.redirect_uri,
+            'state': self.state,
+            'scope': 'email'  # Add any additional scopes as needed
+        }
+        authorization_url = 'https://www.facebook.com/v12.0/dialog/oauth?' + urlencode(params)
+        return authorization_url
+    def get_access_token(self, code):
+        params = {
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+            'redirect_uri': self.redirect_uri,
+            'code': code
+        }
+        response = requests.get('https://graph.facebook.com/v12.0/oauth/access_token', params=params)
+        return response.json()
+
+    def get_user_info(self, access_token):
+        params = {
+            'access_token': access_token,
+            'fields': 'id,name,email'  # Customize fields as needed
+        }
+        user_info_url = 'https://graph.facebook.com/v12.0/me'
+        response = requests.get(user_info_url, params=params)
+        data = response.json()
+        return data
+    
+    def get_access_and_refresh_tokens(self, user):
+        serializer = TokenObtainPairSerializer()
+        token_data = serializer.get_token(user)
+        access_token = token_data.access_token
+        refresh_token = RefreshToken.for_user(user)
+        return access_token, refresh_token

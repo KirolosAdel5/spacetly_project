@@ -12,6 +12,9 @@ from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 # from .tasks import send_gpt_request, generate_title_request
 from .tasks import chat, memory, define_conv_chain , google_gemini, chat_openai_gpt3, chat_openai_gpt4
+import json
+from django.core.serializers.json import DjangoJSONEncoder
+
 # from .chat_image import image_genrate
 User = get_user_model()
 
@@ -31,7 +34,7 @@ class ConversationListCreate(generics.ListCreateAPIView):
     """
     serializer_class = ConversationSerializer
     filter_backends = [ SearchFilter]
-    search_fields = ['title']
+    search_fields = ['title','ai_model']
 
 
     def get_queryset(self):
@@ -124,7 +127,6 @@ class MessageList(generics.ListAPIView):
         conversation = get_object_or_404(Conversation, id=self.kwargs['conversation_id'], user=self.request.user)
         return Message.objects.filter(conversation=conversation).select_related('conversation')
 
-
 # Create a message in a conversation
 class MessageCreate(generics.CreateAPIView):
     """
@@ -182,7 +184,7 @@ class MessageCreate(generics.CreateAPIView):
             conversation.save()
 
         
-        return response, conversation.id, messages[0].id
+        return response, conversation.id, messages[-1].id
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -258,6 +260,46 @@ class ConversationRetrieveUpdateView(generics.RetrieveUpdateAPIView):
             serializer = self.get_serializer(conversation)
             return Response(serializer.data)
 
+class MessageReloadResponse(APIView):
+    def post(self, request, conversation_id, message_id):
+        # Fetch the current message
+        message = get_object_or_404(Message, id=message_id, conversation_id=conversation_id)
+        
+        # Fetch the previous message associated with in_reply_to_id
+        previous_message = get_object_or_404(Message, id=message.in_reply_to_id, conversation_id=conversation_id)
+        
+        # Fetch the conversation
+        conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+
+        # Retrieve existing reloaded messages if any
+        reloaded_messages = json.loads(message.reloaded_message) if message.reloaded_message else []
+
+        # Check the AI model and define the chat model accordingly
+        if conversation.ai_model == "ChatGPT":
+            chat_model = define_conv_chain(memory, chat_openai_gpt3)
+        elif conversation.ai_model == "GPT4":
+            chat_model = define_conv_chain(memory, chat_openai_gpt4)
+        elif conversation.ai_model == "Google PalM 2":
+            chat_model = define_conv_chain(memory, google_gemini)
+        elif conversation.ai_model == "ImageGenerator":
+            # For ImageGenerator, handle the response differently
+            response = "This feature is not yet available"
+        else:
+            # Default to Google PalM 2 if the provided AI model is invalid
+            chat_model = define_conv_chain(memory, google_gemini)
+        
+        if conversation.ai_model != "ImageGenerator":
+            response = chat(chat_model, previous_message.content)
+
+        # Append the new response to the reloaded_messages list
+        reloaded_messages.append(response)
+
+        # Update the reloaded_message field of the message object with the updated list
+        message.reloaded_message = json.dumps(reloaded_messages)
+        message.save()
+
+        return Response({"response": reloaded_messages})        
+        
 
 # class GPT3TaskStatus(APIView):
 #     """

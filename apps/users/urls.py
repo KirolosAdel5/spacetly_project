@@ -15,7 +15,9 @@ urlpatterns = [
     
     path("google-login/", GoogleLoginRedirectView.as_view(), name="google_login_redirect"),
     path("google-callback/", GoogleLoginCallbackView.as_view(), name="google_login_callback"),
-
+    path("facebook-login/", FacebookLoginRedirectView.as_view(), name="google_login_redirect"),
+    path("facebook-callback/", FacebookLoginCallbackView.as_view(), name="google_login_callback"),
+    
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     path('userinfo/', current_user,name='user_info'), 

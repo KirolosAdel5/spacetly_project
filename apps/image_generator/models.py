@@ -20,9 +20,16 @@ class Image_Gene(models.Model):
         return self.username
 
     def delete(self, *args, **kwargs):
-        # Remove image files from media directory
-        for image_id, file_path in self.image_paths:
-            image_file_path = os.path.join(settings.MEDIA_ROOT, file_path)
+        try:
+                
+            image_relative_path = self.image_paths.split('/media/', 1)[-1]
+            
+            # Construct full file path relative to MEDIA_ROOT
+            image_file_path = os.path.join(settings.MEDIA_ROOT, image_relative_path)
+
             if os.path.exists(image_file_path):
                 os.remove(image_file_path)
-        super().delete(*args, **kwargs)
+            super().delete(*args, **kwargs)
+        
+        except Exception as e:
+            super().delete(*args, **kwargs)

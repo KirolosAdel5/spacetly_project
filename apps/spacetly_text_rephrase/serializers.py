@@ -12,7 +12,7 @@ class TextRepharseImageSerializer(serializers.ModelSerializer):
 
 class TextSerializer(serializers.ModelSerializer):
     rephrased_images = TextRepharseImageSerializer(many=True, read_only=True)
-
+    id = serializers.UUIDField(source='unique_id', read_only=True)
     class Meta:
         model = Text
-        fields = ['unique_id','title','original_text', 'rephrased_text', 'created_at','updated_at', 'rephrased_images']
+        fields = ['id','title','original_text', 'rephrased_text', 'created_at','updated_at', 'rephrased_images']

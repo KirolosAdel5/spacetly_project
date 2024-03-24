@@ -57,6 +57,33 @@ class LastUsersPagination(LimitOffsetPagination):
     default_limit = 10
     max_limit = 10
 
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.count,
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'first': self.get_first_link(),
+            'last': self.get_last_link(),
+            'results': data
+        })
+
+    def get_last_link(self):
+        if not self.request:
+            return None
+        if not self.request.query_params.get('offset'):
+            return None
+        url = self.request.build_absolute_uri()
+        offset = (self.count // self.limit) * self.limit
+        if offset <= 0:
+            return None
+        return f'{url}?limit={self.limit}&offset={offset}'
+
+    def get_first_link(self):
+        if not self.request:
+            return None
+        url = self.request.build_absolute_uri()
+        return f'{url}?limit={self.limit}&offset=0'
+
 class UserManagementViewSet(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = AdminUserSerializer
@@ -71,10 +98,28 @@ class UserManagementInfoViewSet(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = AdminUserSerializer
     permission_classes = [IsAdminUser]
+    
+    
+    data = {
+        "month": calendar.month_abbr[1:],
+        "words_generated": [random.randint(0, 2500) for i in range(1, 13)],
+        "images_generated": [random.randint(0, 15) for i in range(1, 13)],
+    }
+    
+    words_images_generated_graph = []
 
+    for i in range(12):
+        month_data = {
+            "images": data["images_generated"][i],
+            "words": data["words_generated"][i],
+            "month": data["month"][i],
+        }
+        words_images_generated_graph.append(month_data)
+    
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
+        
         data =         {
             "user_info": serializer.data,
             "user_genrated" : {
@@ -90,11 +135,7 @@ class UserManagementInfoViewSet(generics.RetrieveUpdateDestroyAPIView):
                 "prepaid_words_available":0,
                 "percentage": random.randint(0, 100),
             },
-            "words_images_generated_graph":{
-                "month": calendar.month_abbr[1:],
-                "words_generated": [random.randint(0, 2500) for i in range(1, 13)],
-                "images_generated": [random.randint(0, 15) for i in range(1, 13)],
-            },
+            "words_images_generated_graph": self.words_images_generated_graph,
             "transactions":[
                 {
                     "order_id": "RxJFnhms8h",
@@ -104,7 +145,7 @@ class UserManagementInfoViewSet(generics.RetrieveUpdateDestroyAPIView):
                     "Gateway": "PayPal",
                     "paid_on_date": "05 Mar 2024",
                     "paid_on_time": "03:18 AM",
-                    "Pricing Plan": "Monthly"
+                    "pricing_plan": "Monthly"
                 },
                 {
             "order_id": "RxJFnhms8h",
@@ -114,7 +155,7 @@ class UserManagementInfoViewSet(generics.RetrieveUpdateDestroyAPIView):
             "Gateway": "PayPal",
             "paid_on_date": "05 Mar 2024",
             "paid_on_time": "03:18 AM",
-            "Pricing Plan": "Monthly"
+            "pricing_plan": "Monthly"
                 },                
             ]
             
@@ -318,12 +359,9 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             start_date = datetime(current_date.year, 1, 1)
             end_date = current_date
 
-        # Query images within the specified period
-        images = Image_Gene.objects.filter(created_at__range=[start_date, end_date])
-
-        # Calculate total images
-        total_images = images.aggregate(total_images=Sum('num_of_image'))['total_images'] or 0
-        
+        # count images in Image_Gene table
+        total_images = len(Image_Gene.objects.filter(created_at__range=[start_date, end_date]))
+                
         return total_images
 
     def get_total_images_generated_info(self):
@@ -481,7 +519,7 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             'Gateway' : 'PayPal',
             'paid_on_date' :timezone.now().strftime("%d %b %Y"),
             'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-            'Pricing Plan': 'Monthly',
+            'pricing_plan': 'Monthly',
 
         },
             {
@@ -497,7 +535,7 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             'Gateway' : 'PayPal',
             'paid_on_date' :timezone.now().strftime("%d %b %Y"),
             'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-            'Pricing Plan': 'Monthly',
+            'pricing_plan': 'Monthly',
 
         },
             {
@@ -513,7 +551,7 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             'Gateway' : 'PayPal',
             'paid_on_date' :timezone.now().strftime("%d %b %Y"),
             'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-            'Pricing Plan': 'Monthly',
+            'pricing_plan': 'Monthly',
 
         },
                   {
@@ -529,7 +567,7 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             'Gateway' : 'PayPal',
             'paid_on_date' :timezone.now().strftime("%d %b %Y"),
             'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-            'Pricing Plan': 'Monthly',
+            'pricing_plan': 'Monthly',
 
         },
             {
@@ -545,7 +583,7 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             'Gateway' : 'PayPal',
             'paid_on_date' :timezone.now().strftime("%d %b %Y"),
             'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-            'Pricing Plan': 'Monthly',
+            'pricing_plan': 'Monthly',
 
         },
             {
@@ -561,7 +599,7 @@ class AdminDashboardViewSet(generics.GenericAPIView):
             'Gateway' : 'PayPal',
             'paid_on_date' :timezone.now().strftime("%d %b %Y"),
             'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-            'Pricing Plan': 'Monthly',
+            'pricing_plan': 'Monthly',
 
         }
             
@@ -674,8 +712,8 @@ class TransactionViewSet(generics.ListAPIView):
                     'Gateway' : 'PayPal',
                     'paid_on_date' :timezone.now().strftime("%d %b %Y"),
                     'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-                    'Pricing Plan': 'Monthly',
-                    'Payment Frequency': random.choice(['Prepaid', 'On-demand','Postpaid', 'Annual']),
+                    'pricing_plan': 'Monthly',
+                    'payment_frequency': random.choice(['Prepaid', 'On-demand','Postpaid', 'Annual']),
                     
                 },
             )
@@ -709,8 +747,8 @@ class TransactionInfoViewSet(generics.ListAPIView):
                     'Gateway' : 'PayPal',
                     'paid_on_date' :timezone.now().strftime("%d %b %Y"),
                     'paid_on_time' :timezone.now().strftime("%I:%M %p"),
-                    'Pricing Plan': 'Monthly',
-                    'Payment Frequency': random.choice(['Prepaid', 'On-demand','Postpaid', 'Annual']),
+                    'pricing_plan': 'Monthly',
+                    'payment_frequency': random.choice(['Prepaid', 'On-demand','Postpaid', 'Annual']),
                     
                 }
     def get(self, request, *args, **kwargs):
